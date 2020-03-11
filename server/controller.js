@@ -524,7 +524,6 @@ router.post('/insert_institucion', verify_token, (req, res, next) => {
         " calendario," +
         " tipo," +
         " contactos" +
-        " tipo_pago" +
         " )" +
         " VALUES" +
         " (" +
@@ -641,7 +640,7 @@ router.get('/email_exists', verify_token, (req, res, next) => {
     });
 })
 
-router.post('/insert_doctor', verify_token, (req, res, next) => {
+router.post('/insert_doctor', verify_token, (request, res, next) => {
     var query_string = "";
     query_string = query_string + " INSERT INTO users (username,password,creation_date,profile_id,active)";
     query_string = query_string + " VALUES (\"" + request.payload.username + "\",SHA1(\"" + request.payload.username + "\"),NOW(),2,1);";
@@ -717,7 +716,7 @@ router.post('/insert_doctor', verify_token, (req, res, next) => {
     });
 })
 
-router.put('/update_doctor', verify_token, (req, res, next) => {
+router.put('/update_doctor', verify_token, (request, res, next) => {
     let foto = "";
     if (request.payload.foto != 'null') {
         foto = request.payload.foto;
@@ -743,120 +742,92 @@ router.put('/update_doctor', verify_token, (req, res, next) => {
     con.query(query_string, function (err, result, fields) {
         if (err) {
             console.log(err);
-            reply(-1);
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
         } else {
-            reply(1);
+            return res.status(200).json({
+                title: 'Médico Actualizado Exitosamente',
+                message: "El médico ha sido actualizado de manera satisfactoria"
+            })
         }
     });
 })
 
+router.delete('/delete_doctor', verify_token, (request, res, next) => {
+    let query_string = "";
+    query_string = query_string + " DELETE FROM doctors";
+    query_string = query_string + " WHERE doctor_id = " + request.query.doctor_id;
+    con.query(query_string, function (err, result, fields) {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            return res.status(200).json({
+                title: 'Médico Eliminado Exitosamente',
+                message: "El médico ha sido eliminado de manera satisfactoria"
+            })
+        }
+    });
+})
 
+router.get('/get_doctor', verify_token, (request, res, next) => {
+    let query_string = "";
+    query_string = query_string + " SELECT doctors.*, users.username, institutions.name as institution_name FROM doctors";
+    query_string = query_string + " INNER JOIN institutions ON doctors.institution_id = institutions.institution_id";
+    query_string = query_string + " INNER JOIN users ON doctors.user_id = users.user_id";
+    query_string = query_string + " WHERE doctor_id = " + request.query.doctor_id;
+    con.query(query_string, function (err, result, fields) {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            return res.status(200).json(result)
+        }
+    });
+})
 
-// exports.update_doctor = {
-// 	payload: {
-//        maxBytes: Number.MAX_SAFE_INTEGER
-//     },
-//     handler: function(request, reply) {
-//     	var foto = "";
-//     	if(request.payload.foto!='null'){
-//     		foto = request.payload.foto;
-//     	}
-//     	var query_string = "";
-//     	query_string=query_string + " UPDATE doctors";
-//     	query_string=query_string + " SET institution_id="+request.payload.institution_id+",";
-// 		query_string=query_string + " first_name='"+request.payload.first_name+"',";
-// 		query_string=query_string + " last_name='"+request.payload.last_name+"',";
-// 		query_string=query_string + " phone='"+request.payload.phone+"',";
-// 		query_string=query_string + " extension='"+request.payload.extension+"',";
-// 		query_string=query_string + " email='"+request.payload.email+"',";
-// 		query_string=query_string + " address='"+request.payload.address+"',";
-// 		query_string=query_string + " id_card='"+request.payload.id_card+"',";
-// 		query_string=query_string + " id_college='"+request.payload.id_college+"',";
-// 		query_string=query_string + " id_rtn='"+request.payload.id_rtn+"',";
-// 		query_string=query_string + " academic_information='"+request.payload.academic_information+"',";
-// 		query_string=query_string + " background_information='"+request.payload.background_information+"',";
-// 		query_string=query_string + " position='"+request.payload.position+"',";
-// 		query_string=query_string + " working_hours='"+request.payload.working_hours+"',";
-// 		query_string=query_string + " foto='"+foto+"'";
-// 		query_string=query_string + " WHERE doctor_id="+request.payload.doctor_id+";";
-//     	con.query(query_string, function (err, result, fields) {
-// 		    if(err){
-// 		    	console.log(err);
-// 		    	reply(-1);
-// 		    }else{
-// 		    	reply(1);
-// 		    } 
-// 		});
-//     }
-// };
+router.get('/doctors_list', verify_token, (request, res, next) => {
+    let query_string = "";
+    query_string = query_string + " SELECT doctors.*, users.username, instituciones.nombre as institution_name FROM doctors";
+    query_string = query_string + " INNER JOIN instituciones ON doctors.institution_id = institutions.institution_id";
+    query_string = query_string + " INNER JOIN users ON doctors.user_id = users.user_id";
+    con.query(query_string, function (err, result, fields) {
+        if (err) {
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            return res.status(200).json(result)
+        }
+    });
+})
 
-// exports.delete_doctor = {
-//     handler: function(request, reply) {
-//     	var query_string = "";
-//     	query_string=query_string + " DELETE FROM doctors";
-// 		query_string=query_string + " WHERE doctor_id = " + request.query.doctor_id;
-//     	con.query(query_string, function (err, result, fields) {
-// 		    if(err){
-// 		    	console.log(err);
-// 		    	reply(-1);
-// 		    }else{
-// 		    	reply(1);
-// 		    } 
-// 		});
-//     }
-// };
+router.get('/doctors_institution_list', verify_token, (request, res, next) => {
+    let query_string = "";
+    query_string = query_string + " SELECT doctors.*, users.username FROM doctors";
+    query_string = query_string + " INNER JOIN users ON doctors.user_id = users.user_id";
+    query_string = query_string + " WHERE doctors.institution_id = " + request.query.institution_id;
+    con.query(query_string, function (err, result, fields) {
+        if (err) {
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            return res.status(200).json(result)
+        }
+    });
+})
 
-// exports.get_doctor = {
-//     handler: function(request, reply) {
-//     	var query_string = "";
-//     	query_string=query_string + " SELECT doctors.*, users.username, institutions.name as institution_name FROM doctors";
-// 		query_string=query_string + " INNER JOIN institutions ON doctors.institution_id = institutions.institution_id";
-// 		query_string=query_string + " INNER JOIN users ON doctors.user_id = users.user_id";
-// 		query_string=query_string + " WHERE doctor_id = " + request.query.doctor_id;
-//     	con.query(query_string, function (err, result, fields) {
-// 		    if(err){
-// 		    	console.log(err);
-// 		    	reply(-1);
-// 		    }else{
-// 		    	reply(result);
-// 		    } 
-// 		});
-//     }
-// };
-
-// exports.get_doctors_list = {
-//     handler: function(request, reply) {
-//     	var query_string = "";
-//     	query_string=query_string + " SELECT doctors.*, users.username, institutions.name as institution_name FROM doctors";
-// 		query_string=query_string + " INNER JOIN institutions ON doctors.institution_id = institutions.institution_id";
-// 		query_string=query_string + " INNER JOIN users ON doctors.user_id = users.user_id";
-//     	con.query(query_string, function (err, result, fields) {
-// 		    if(err){
-// 		    	console.log(err);
-// 		    	reply(-1);
-// 		    }else{
-// 		    	reply(result);
-// 		    } 
-// 		});
-//     }
-// };
-
-// exports.get_doctors_institution_list = {
-//     handler: function(request, reply) {
-//     	var query_string = "";
-//     	query_string=query_string + " SELECT doctors.*, users.username FROM doctors";
-// 		query_string=query_string + " INNER JOIN users ON doctors.user_id = users.user_id";
-// 		query_string=query_string + " WHERE doctors.institution_id = " + request.query.institution_id;
-//     	con.query(query_string, function (err, result, fields) {
-// 		    if(err){
-// 		    	console.log(err);
-// 		    	reply(-1);
-// 		    }else{
-// 		    	reply(result);
-// 		    } 
-// 		});
-//     }
-// };
 
 //########################################################################
 //GROUPS #################################################################
@@ -866,7 +837,7 @@ router.put('/update_doctor', verify_token, (req, res, next) => {
     " SELECT id, grp_nombre FROM" +
     " smsreseller_grupos" +
     " WHERE" +
-    " id NOT IN (SELECT smsreseller_grupos_id FROM smsreseller_listacrm)" +
+    " id NOT IN (SELECT smsreseller_gru os_id FROM smsreseller_listacrm)" +
     " AND smsreseller_grupos.tipo = 0" +
     " AND smsadmin_resellers_id = ?";
     var values = [
