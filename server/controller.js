@@ -797,8 +797,8 @@ router.get('/get_doctor', verify_token, (request, res, next) => {
 router.get('/doctors_list', verify_token, (request, res, next) => {
     let query_string = "";
     query_string = query_string + " SELECT doctors.*, users.username, instituciones.nombre as institution_name FROM doctors";
-    query_string = query_string + " INNER JOIN instituciones ON doctors.institution_id = institutions.institution_id";
-    query_string = query_string + " INNER JOIN users ON doctors.user_id = users.user_id";
+    query_string = query_string + " INNER JOIN instituciones ON doctors.institution_id = instituciones.id";
+    query_string = query_string + " INNER JOIN users ON doctors.user_id = users.id";
     con.query(query_string, function (err, result, fields) {
         if (err) {
             return res.status(500).json({
@@ -814,7 +814,7 @@ router.get('/doctors_list', verify_token, (request, res, next) => {
 router.get('/doctors_institution_list', verify_token, (request, res, next) => {
     let query_string = "";
     query_string = query_string + " SELECT doctors.*, users.username FROM doctors";
-    query_string = query_string + " INNER JOIN users ON doctors.user_id = users.user_id";
+    query_string = query_string + " INNER JOIN users ON doctors.user_id = users.id";
     query_string = query_string + " WHERE doctors.institution_id = " + request.query.institution_id;
     con.query(query_string, function (err, result, fields) {
         if (err) {
