@@ -641,9 +641,11 @@ router.get('/email_exists', verify_token, (req, res, next) => {
 })
 
 router.post('/insert_doctor', verify_token, (request, res, next) => {
+    console.log(request.body);
+    
     var query_string = "";
-    query_string = query_string + " INSERT INTO users (username,password,creation_date,profile_id,active)";
-    query_string = query_string + " VALUES (\"" + request.payload.username + "\",SHA1(\"" + request.payload.username + "\"),NOW(),2,1);";
+    query_string = query_string + " INSERT INTO users (username,password,user_email,creation_date,profile_id,active)";
+    query_string = query_string + " VALUES (\"" + request.body.email + "\",SHA1(\"" + request.body.email + "\"),\"" + request.body.email + "\",NOW(),2,1);";
     query_string = query_string + " SELECT LAST_INSERT_ID() AS response;";
 
     con.query(query_string, function (err, result, fields) {
@@ -655,26 +657,26 @@ router.post('/insert_doctor', verify_token, (request, res, next) => {
             })
         } else {
             var foto = "";
-            if (request.payload.foto != 'null') {
-                foto = request.payload.foto;
+            if (request.body.foto !== 'null') {
+                foto = request.body.foto;
             }
             var records = [
                 [
                     result[0].insertId,
-                    request.payload.institution_id,
-                    request.payload.first_name,
-                    request.payload.last_name,
-                    request.payload.phone,
-                    request.payload.extension,
-                    request.payload.email,
-                    request.payload.address,
-                    request.payload.id_card,
-                    request.payload.id_college,
-                    request.payload.id_rtn,
-                    request.payload.academic_information,
-                    request.payload.background_information,
-                    request.payload.position,
-                    request.payload.working_hours,
+                    request.body.institution_id,
+                    request.body.first_name,
+                    request.body.last_name,
+                    request.body.phone,
+                    request.body.extension,
+                    request.body.email,
+                    request.body.address,
+                    request.body.id_card,
+                    request.body.id_college,
+                    request.body.id_rtn,
+                    request.body.academic_information,
+                    request.body.background_information,
+                    request.body.position,
+                    request.body.working_hours,
                     foto
                 ],
             ];
@@ -697,7 +699,9 @@ router.post('/insert_doctor', verify_token, (request, res, next) => {
             query_string2 = query_string2 + " working_hours,";
             query_string2 = query_string2 + " foto)";
             query_string2 = query_string2 + " VALUES ?";
-
+            console.log(query_string2);
+            console.log(records);
+            
             con.query(query_string2, [records], function (err2, result2, fields2) {
                 if (err2) {
                     console.log(err2);
