@@ -403,6 +403,20 @@ router.post('/request_password_change_first_login', (req, res, next) => {
 
 //########################################################################
 //INSTITUCIONES ##########################################################
+router.get('/get_institutions', verify_token, (req, res, next) => {
+    let query_string = "";
+    query_string = query_string + " SELECT * FROM instituciones";
+    con.query(query_string, function (err, result, fields) {
+        if (err) {
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            return res.status(200).json(result)
+        }
+    });
+})
 
 router.get('/get_instituciones', verify_token, (req, res, next) => {
     var count_values = [];
@@ -641,7 +655,7 @@ router.get('/email_exists', verify_token, (req, res, next) => {
 })
 
 router.post('/insert_doctor', verify_token, (request, res, next) => {
-    console.log(request.body);
+    console.log(request.body, 'asdasdasd');
 
     var query_string = "";
     query_string = query_string + " INSERT INTO users (username,password,user_email,creation_date,profile_id,active,role)";
@@ -997,6 +1011,7 @@ router.post('/insert_medicamento', verify_token, (request, res, next) => {
             request.body.nombre_comercial,
             request.body.presentacion,
             request.body.concentracion,
+            request.body.product_id
         ],
     ];
     let query_string = "";
@@ -1004,7 +1019,8 @@ router.post('/insert_medicamento', verify_token, (request, res, next) => {
     query_string = query_string + " (nombre,";
     query_string = query_string + " nombre_comercial,";
     query_string = query_string + " presentacion,";
-    query_string = query_string + " concentracion)";
+    query_string = query_string + " concentracion,";
+    query_string = query_string + " product_id)";
     query_string = query_string + " VALUES ?";
 
     con.query(query_string, [records], function (err, result, fields) {
@@ -1030,13 +1046,15 @@ router.post('/insert_insumo', verify_token, (request, res, next) => {
             request.body.tipo_insumo,
             request.body.nombre_comercial,
             request.body.presentacion,
+            request.body.product_id,
         ],
     ];
     let query_string = "";
     query_string = query_string + " INSERT INTO insumos";
     query_string = query_string + " (tipo_insumo,";
     query_string = query_string + " nombre_comercial,";
-    query_string = query_string + " presentacion)";
+    query_string = query_string + " presentacion,";
+    query_string = query_string + " product_id)";
     query_string = query_string + " VALUES ?";
 
     con.query(query_string, [records], function (err, result, fields) {
@@ -1058,8 +1076,10 @@ router.post('/insert_insumo', verify_token, (request, res, next) => {
 
 router.get('/get_inventario_medicamento', verify_token, (request, res, next) => {
     let query_string = "";
-    query_string = query_string + " SELECT inventario_medicamentos.*, medicamentos.nombre as inventory_name FROM inventario_medicamentos";
+    query_string = query_string + " SELECT inventario_medicamentos.*, medicamentos.nombre as inventory_name, products.product_id as product_id, batchs.batch_id as batch_id FROM inventario_medicamentos";
     query_string = query_string + " INNER JOIN medicamentos ON inventario_medicamentos.medicamento_id = medicamentos.medicamento_id";
+    query_string = query_string + " INNER JOIN products ON medicamentos.product_id = products.product_id";
+    query_string = query_string + " INNER JOIN batchs ON products.product_id = batchs.product_id";
     query_string = query_string + " WHERE inventario_medicamentos.saldo_inventario > 0";
     con.query(query_string, function (err, result, fields) {
         if (err) {
@@ -1076,8 +1096,10 @@ router.get('/get_inventario_medicamento', verify_token, (request, res, next) => 
 
 router.get('/get_inventario_insumo', verify_token, (request, res, next) => {
     let query_string = "";
-    query_string = query_string + " SELECT inventario_insumos.*, insumos.tipo_insumo as inventory_name FROM inventario_insumos";
+    query_string = query_string + " SELECT inventario_insumos.*, insumos.tipo_insumo as inventory_name, products.product_id as product_id, batchs.batch_id as batch_id FROM inventario_insumos";
     query_string = query_string + " INNER JOIN insumos ON inventario_insumos.insumo_id = insumos.insumo_id";
+    query_string = query_string + " INNER JOIN products ON insumos.product_id = products.product_id";
+    query_string = query_string + " INNER JOIN batchs ON products.product_id = batchs.product_id";
     query_string = query_string + " WHERE inventario_insumos.saldo_inventario > 0";
     con.query(query_string, function (err, result, fields) {
         if (err) {
@@ -1088,6 +1110,69 @@ router.get('/get_inventario_insumo', verify_token, (request, res, next) => {
             })
         } else {
             return res.status(200).json(result);
+        }
+    });
+})
+
+router.post('/insert_cartera_medicamento', verify_token, (request, res, next) => {
+    let records = [
+        [
+            request.body.cartera_id,
+            request.body.medicamento_id,
+            request.body.cantidad,
+            request.body.product_id
+        ],
+    ];
+    let query_string = "";
+    query_string = query_string + " INSERT INTO cartera_medicamentos";
+    query_string = query_string + " (cartera_id,";
+    query_string = query_string + " medicamento_id,";
+    query_string = query_string + " cantidad,";
+    query_string = query_string + " product_id)";
+    query_string = query_string + " VALUES ?";
+    
+    con.query(query_string, [records], function (err, result, fields) {
+        if (err) {
+            console.log(err.message);
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            let query_string2 = "";
+            query_string2 = query_string2 + " SELECT * FROM inventario_medicamentos";
+            query_string2 = query_string2 + " WHERE medicamento_id = " + request.body.medicamento_id;
+            query_string2 = query_string2 + " ORDER BY vencimiento";
+            con.query(query_string, function (err2, result2, fields) {
+                if (err2) {
+                    console.log(err2);
+                    return res.status(500).json({
+                        title: 'Error',
+                        message: err2.message
+                    })
+                } else {
+                    query_string3 = query_string3 + " UPDATE inventario_medicamentos";
+                    query_string3 = query_string3 + " SET en_cartera=" + (Number(result2[0].en_cartera) - Number(request.body.cantidad)) + ",";
+                    query_string3 = query_string3 + " saldo_inventario=" + (Number(result2[0].saldo_inventario) - Number(request.body.cantidad)) + ",";
+                    query_string3 = query_string3 + " salida_inventario=" + (Number(result2[0].salida_inventario) + Number(request.body.cantidad));
+                    query_string3 = query_string3 + " WHERE inventario_id=" + result2[0].inventario_id + ";";
+                    con.query(query_string, function (err3, result3, fields) {
+                        if (err3) {
+                            console.log(err3);
+                            return res.status(500).json({
+                                title: 'Error',
+                                message: err3.message
+                            })
+                        } else {
+                            return res.status(200).json({
+                                title: 'Medicamento ingresado en cartera exitosamente',
+                                message: 'El medicamento fue insertado de manera satisfactoria',
+                                insumo_id: result.insertId
+                            })
+                        }
+                    })
+                }
+            });
         }
     });
 })
@@ -1265,17 +1350,14 @@ router.post('/insert_inventario_medicamento', verify_token, (request, res, next)
         [
             request.body.costo_compra,
             request.body.cantidad_dosis,
-            (parseFloat(request.body.costo_compra)/parseFloat(request.body.cantidad_dosis)),
+            (parseFloat(request.body.costo_compra) / parseFloat(request.body.cantidad_dosis)),
             request.body.entrada_inventario,
             0,
             request.body.entrada_inventario,
-            request.body.vencimiento,
             request.body.numero_inventario,
             0,
             request.body.entrada_inventario,
-            request.body.comentarios,
             request.body.medicamento_id,
-            request.body.fecha_compra,
         ],
     ];
     let query_string = "";
@@ -1286,13 +1368,10 @@ router.post('/insert_inventario_medicamento', verify_token, (request, res, next)
     query_string = query_string + " entrada_inventario,";
     query_string = query_string + " salida_inventario,";
     query_string = query_string + " saldo_inventario,";
-    query_string = query_string + " vencimiento,";
     query_string = query_string + " numero_inventario,";
     query_string = query_string + " en_cartera,";
     query_string = query_string + " sin_cartera,";
-    query_string = query_string + " comentarios,";
-    query_string = query_string + " medicamento_id,";
-    query_string = query_string + " fecha_compra)";
+    query_string = query_string + " medicamento_id)";
     query_string = query_string + " VALUES ?";
 
     con.query(query_string, [records], function (err, result, fields) {
@@ -1316,18 +1395,15 @@ router.post('/insert_inventario_insumos', verify_token, (request, res, next) => 
     let records = [
         [
             request.body.costo_compra,
-            (parseFloat(request.body.costo_compra)/parseFloat(request.body.cantidad)),
+            (parseFloat(request.body.costo_compra) / parseFloat(request.body.cantidad)),
             request.body.cantidad,
             request.body.entrada_inventario,
             0,
             request.body.entrada_inventario,
-            request.body.vencimiento,
             request.body.numero_inventario,
             0,
             request.body.entrada_inventario,
-            request.body.comentarios,
-            request.body.medicamento_id,
-            request.body.fecha_compra,
+            request.body.insumo_id,
         ],
     ];
     let query_string = "";
@@ -1338,13 +1414,10 @@ router.post('/insert_inventario_insumos', verify_token, (request, res, next) => 
     query_string = query_string + " entrada_inventario,";
     query_string = query_string + " salida_inventario,";
     query_string = query_string + " saldo_inventario,";
-    query_string = query_string + " vencimiento,";
     query_string = query_string + " numero_inventario,";
     query_string = query_string + " en_cartera,";
     query_string = query_string + " sin_cartera,";
-    query_string = query_string + " comentarios,";
-    query_string = query_string + " insumo_id,";
-    query_string = query_string + " fecha_compra)";
+    query_string = query_string + " insumo_id)";
     query_string = query_string + " VALUES ?";
 
     con.query(query_string, [records], function (err, result, fields) {
@@ -2472,6 +2545,41 @@ router.delete('/delete_batch', verify_token, (request, res, next) => {
                     }
                 });
             }
+        }
+    });
+});
+
+router.get('/get_products', verify_token, (request, res, next) => {
+    let query_string = "";
+    query_string = query_string + " SELECT * FROM products";
+    query_string = query_string + " INNER JOIN medicamentos ON products.product_id = medicamentos.product_id";
+    con.query(query_string, function (err1, result1, fields) {
+        if (err1) {
+            console.log(err1);
+            return res.status(500).json({
+                title: 'Error',
+                message: err1.message
+            })
+        } else {
+            let query_string2 = "";
+            query_string2 = query_string2 + " SELECT * FROM products";
+            query_string2 = query_string2 + " INNER JOIN insumos ON products.product_id = insumos.product_id";
+            con.query(query_string2, function (err2, result2, fields) {
+                if (err2) {
+                    console.log(err2);
+                    return res.status(500).json({
+                        title: 'Error',
+                        message: err2.message
+                    })
+                } else {
+                    return res.status(200).json(
+                        {
+                            medicamentos: result1,
+                            insumos: result2
+                        }
+                    )
+                }
+            });
         }
     });
 });
