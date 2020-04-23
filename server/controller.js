@@ -409,7 +409,8 @@ router.post('/request_password_change_first_login', (req, res, next) => {
 router.get('/get_institutions', verify_token, (req, res, next) => {
     let query_string = "";
     query_string = query_string + " SELECT instituciones.*, COUNT(patients.patient_id) as student_count FROM instituciones";
-    query_string = query_string + " INNER JOIN patients ON patients.institution_id = instituciones.id";
+    query_string = query_string + " INNER JOIN assigned_patients ON assigned_patients.institution_id = instituciones.id";
+    query_string = query_string + " INNER JOIN patients ON patients.patient_id = assigned_patients.patient_id";
     con.query(query_string, function (err, result, fields) {
         if (err) {
             return res.status(500).json({
@@ -437,7 +438,8 @@ router.get('/get_institution', verify_token, (req, res, next) => {
         } else {
             let query_string2 = "";
             query_string2 = query_string2 + " SELECT * FROM patients";
-            query_string2 = query_string2 + " WHERE patients.institution_id=" + req.query.institution_id;
+            query_string2 = query_string2 + " INNER JOIN assigned_patients ON assigned_patients.institution_id = " + req.query.institution_id;
+            query_string2 = query_string2 + " WHERE assigned_patients.institution_id=" + req.query.institution_id;
             con.query(query_string2, function (err, result2, fields) {
                 if (err) {
                     console.log(err);
@@ -448,7 +450,8 @@ router.get('/get_institution', verify_token, (req, res, next) => {
                 } else {
                     let query_string3 = "";
                     query_string3 = query_string3 + " SELECT * FROM doctors";
-                    query_string3 = query_string3 + " WHERE doctors.institution_id =" + req.query.institution_id;
+                    query_string3 = query_string3 + " INNER JOIN assigned_doctors ON assigned_doctors.institution_id = " + req.query.institution_id;
+                    query_string3 = query_string3 + " WHERE assigned_doctors.institution_id =" + req.query.institution_id;
                     con.query(query_string3, function (err, result3, fields) {
                         if (err) {
                             console.log(err);
@@ -577,7 +580,9 @@ router.get('/get_instituciones', verify_token, (req, res, next) => {
 });
 
 router.post('/insert_institucion', verify_token, (req, res, next) => {
-    var query = "" +
+    console.log(req.body);
+
+    let query = "" +
         " INSERT INTO instituciones" +
         " (" +
         " nombre," +
@@ -589,10 +594,14 @@ router.post('/insert_institucion', verify_token, (req, res, next) => {
         " inicio_clases," +
         " calendario," +
         " tipo," +
-        " contactos" +
+        " contactos," +
+        " tipo_pago," +
+        " monto" +
         " )" +
         " VALUES" +
         " (" +
+        " ?," +
+        " ?," +
         " ?," +
         " ?," +
         " ?," +
@@ -614,7 +623,9 @@ router.post('/insert_institucion', verify_token, (req, res, next) => {
         req.body.inicio_clases,
         req.body.calendario,
         req.body.tipo,
-        req.body.contactos
+        req.body.contactos,
+        req.body.tipo_pago,
+        req.body.monto
     ];
     con.query(query, values, function (err, results, fields) {
         if (err) {
@@ -706,10 +717,109 @@ router.get('/email_exists', verify_token, (req, res, next) => {
     });
 })
 
+router.post('/assign_doctor', verify_token, (request, res, next) => {
+    let records = [
+        [
+            request.body.institution_id,
+            request.body.doctor_id,
+        ],
+    ];
+    let query_string = "";
+    query_string = query_string + " INSERT INTO assigned_doctors";
+    query_string = query_string + " (institution_id,";
+    query_string = query_string + " doctor_id)";
+    query_string = query_string + " VALUES ?";
+
+    con.query(query_string, [records], function (err, result, fields) {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({
+                title: 'Error',
+                message: 'El doctor ya ha sido asignado'
+            })
+        } else {
+            return res.status(200).json({
+                title: 'Doctor asignado exitosamente',
+                message: 'El doctor fue asignado de manera satisfactoria'
+            })
+        }
+    });
+})
+
+router.put('/deactivate_doctor', verify_token, (req, res, next) => {
+    let query = "" +
+        " UPDATE assigned_doctors" +
+        " SET active = ?" +
+        " WHERE doctor_id = ?";
+    " AND institution_id = ?";
+    let values = [
+        false,
+        req.body.doctor_id,
+        req.body.institution_id
+    ];
+    con.query(query, values, function (err, results, fields) {
+        if (err) {
+            console.log(err)
+            next(err);
+        } else {
+            res.status(200).json({
+                title: "Medico Desactivado Exitosamente",
+                message: 'El medico ha sido desactivado de forma satisfactoria'
+            });
+        }
+    });
+})
+
+router.put('/activate_doctor', verify_token, (req, res, next) => {
+    let query = "" +
+        " UPDATE assigned_doctors" +
+        " SET active = ?" +
+        " WHERE doctor_id = ?";
+    " AND institution_id = ?";
+    let values = [
+        true,
+        req.body.doctor_id,
+        req.body.institution_id
+    ];
+    con.query(query, values, function (err, results, fields) {
+        if (err) {
+            console.log(err)
+            next(err);
+        } else {
+            res.status(200).json({
+                title: "Medico activado Exitosamente",
+                message: 'El medico ha sido activado de forma satisfactoria'
+            });
+        }
+    });
+})
+
+router.delete('/unassign_doctor', verify_token, (req, res, next) => {
+    let query = "" +
+        " DELETE FROM" +
+        " assigned_doctors" +
+        " WHERE doctor_id = ?";
+    " AND institution_id = ?";
+    let values = [
+        req.query.doctor_id,
+        req.query.institution_id
+    ];
+    con.query(query, values, function (err, results, fields) {
+        if (err) {
+            next(err);
+        } else {
+            res.status(200).json({
+                title: "Medico Removido Exitosamente",
+                message: 'El medico ha sido removido de forma satisfactoria'
+            });
+        }
+    });
+});
+
 router.post('/insert_doctor', verify_token, (request, res, next) => {
     console.log(request.body, 'asdasdasd');
 
-    var query_string = "";
+    let query_string = "";
     query_string = query_string + " INSERT INTO users (username,password,user_email,creation_date,profile_id,active,role)";
     query_string = query_string + " VALUES (\"" + request.body.email + "\",SHA1(\"" + request.body.email + "\"),\"" + request.body.email + "\",NOW(),2,1,2);";
     query_string = query_string + " SELECT LAST_INSERT_ID() AS response;";
@@ -729,11 +839,9 @@ router.post('/insert_doctor', verify_token, (request, res, next) => {
             var records = [
                 [
                     result[0].insertId,
-                    request.body.institution_id,
                     request.body.first_name,
                     request.body.last_name,
                     request.body.phone,
-                    request.body.extension,
                     request.body.email,
                     request.body.address,
                     request.body.id_card,
@@ -741,7 +849,7 @@ router.post('/insert_doctor', verify_token, (request, res, next) => {
                     request.body.id_rtn,
                     JSON.stringify(request.body.academic_information),
                     JSON.stringify(request.body.background_information),
-                    request.body.position,
+                    request.body.ciudad,
                     JSON.stringify(request.body.working_hours),
                     foto
                 ],
@@ -749,11 +857,9 @@ router.post('/insert_doctor', verify_token, (request, res, next) => {
             var query_string2 = "";
             query_string2 = query_string2 + " INSERT INTO doctors";
             query_string2 = query_string2 + " (user_id,";
-            query_string2 = query_string2 + " institution_id,";
             query_string2 = query_string2 + " first_name,";
             query_string2 = query_string2 + " last_name,";
             query_string2 = query_string2 + " phone,";
-            query_string2 = query_string2 + " extension,";
             query_string2 = query_string2 + " email,";
             query_string2 = query_string2 + " address,";
             query_string2 = query_string2 + " id_card,";
@@ -761,7 +867,7 @@ router.post('/insert_doctor', verify_token, (request, res, next) => {
             query_string2 = query_string2 + " id_rtn,";
             query_string2 = query_string2 + " academic_information,";
             query_string2 = query_string2 + " background_information,";
-            query_string2 = query_string2 + " position,";
+            query_string2 = query_string2 + " ciudad,";
             query_string2 = query_string2 + " working_hours,";
             query_string2 = query_string2 + " foto)";
             query_string2 = query_string2 + " VALUES ?";
@@ -778,7 +884,8 @@ router.post('/insert_doctor', verify_token, (request, res, next) => {
                 } else {
                     return res.status(200).json({
                         title: 'Médico ingresado exitosamente',
-                        message: 'El médico fue creado de manera satisfactoria'
+                        message: 'El médico fue creado de manera satisfactoria',
+                        doctor_id: result2.insertId
                     })
                 }
             });
@@ -883,7 +990,8 @@ router.get('/get_doctor_by_user', verify_token, (request, res, next) => {
         } else {
             let query_string2 = "";
             query_string2 = query_string2 + " SELECT instituciones.* FROM doctors";
-            query_string2 = query_string2 + " INNER JOIN instituciones ON doctors.institution_id = instituciones.id";
+            query_string2 = query_string2 + " INNER JOIN assigned_doctors ON assigned_doctors.doctor_id = doctors.doctor_id";
+            query_string2 = query_string2 + " INNER JOIN instituciones ON instituciones.id = assigned_doctors.institution_id";
             query_string2 = query_string2 + " WHERE doctors.user_id = " + request.query.user_id;
             con.query(query_string2, function (err, result2, fields) {
                 if (err) {
@@ -924,7 +1032,7 @@ router.get('/get_doctor_by_user', verify_token, (request, res, next) => {
                                     })
                                 }
                             })
-                            }
+                        }
                     })
                 }
             })
@@ -935,8 +1043,44 @@ router.get('/get_doctor_by_user', verify_token, (request, res, next) => {
 router.get('/doctors_list', verify_token, (request, res, next) => {
     let query_string = "";
     query_string = query_string + " SELECT doctors.*, users.username, instituciones.nombre as institution_name FROM doctors";
-    query_string = query_string + " INNER JOIN instituciones ON doctors.institution_id = instituciones.id";
+    query_string = query_string + " INNER JOIN assigned_doctors ON assigned_doctors.doctor_id = doctors.doctor_id";
+    query_string = query_string + " INNER JOIN instituciones ON assigned_doctors.institution_id = instituciones.id";
     query_string = query_string + " INNER JOIN users ON doctors.user_id = users.id";
+    con.query(query_string, function (err, result, fields) {
+        if (err) {
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            return res.status(200).json(result)
+        }
+    });
+})
+
+router.get('/active_doctor_list', verify_token, (request, res, next) => {
+    let query_string = "";
+    query_string = query_string + " SELECT doctors.* FROM doctors";
+    query_string = query_string + " INNER JOIN assigned_doctors ON assigned_doctors.doctor_id = doctors.doctor_id";    
+    query_string = query_string + " WHERE assigned_doctors.active = true";
+    con.query(query_string, function (err, result, fields) {
+        if (err) {
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            return res.status(200).json(result)
+        }
+    });
+})
+
+router.get('/get_doctors', verify_token, (request, res, next) => {
+    let query_string = "";
+    query_string = query_string + " SELECT doctors.*, CASE WHEN assigned_doctors.institution_id <> 0 THEN instituciones.nombre ELSE 'Sin Asignar' END AS institution_name, instituciones.id as institution_id FROM doctors";
+    query_string = query_string + " LEFT JOIN assigned_doctors ON assigned_doctors.doctor_id = doctors.doctor_id";
+    query_string = query_string + " LEFT JOIN instituciones ON instituciones.id = assigned_doctors.institution_id";
+    // query_string = query_string + " WHERE assigned_doctors ON assigned_doctors.institution_id <> 0";
     con.query(query_string, function (err, result, fields) {
         if (err) {
             return res.status(500).json({
@@ -953,7 +1097,8 @@ router.get('/doctors_institution_list', verify_token, (request, res, next) => {
     let query_string = "";
     query_string = query_string + " SELECT doctors.*, users.username FROM doctors";
     query_string = query_string + " INNER JOIN users ON doctors.user_id = users.id";
-    query_string = query_string + " WHERE doctors.institution_id = " + request.query.institution_id;
+    query_string = query_string + " INNER JOIN assigned_doctors ON assigned_doctors.doctor_id = doctors.doctor_id";
+    query_string = query_string + " WHERE assigned_doctors.institution_id = " + request.query.institution_id;
     con.query(query_string, function (err, result, fields) {
         if (err) {
             return res.status(500).json({
@@ -968,13 +1113,14 @@ router.get('/doctors_institution_list', verify_token, (request, res, next) => {
 
 router.post('/insert_patient', verify_token, (request, res, next) => {
     let foto = "";
+    console.log(request.body);
+
     if (request.body.foto != 'null') {
         foto = request.body.foto;
     }
     let records = [
         [
             request.body.tipo_paciente,
-            request.body.institution_id,
             request.body.first_name,
             request.body.last_name,
             request.body.gender,
@@ -989,7 +1135,6 @@ router.post('/insert_patient', verify_token, (request, res, next) => {
             request.body.address_city,
             request.body.address_state,
             request.body.seccion,
-            request.body.phone,
             JSON.stringify(request.body.emergency_contacts),
             foto
         ],
@@ -997,7 +1142,6 @@ router.post('/insert_patient', verify_token, (request, res, next) => {
     let query_string = "";
     query_string = query_string + " INSERT INTO patients";
     query_string = query_string + " (tipo_paciente,";
-    query_string = query_string + " institution_id,";
     query_string = query_string + " first_name,";
     query_string = query_string + " last_name,";
     query_string = query_string + " gender,";
@@ -1012,7 +1156,6 @@ router.post('/insert_patient', verify_token, (request, res, next) => {
     query_string = query_string + " address_city,";
     query_string = query_string + " address_state,";
     query_string = query_string + " seccion,";
-    query_string = query_string + " phone,";
     query_string = query_string + " emergency_contacts,";
     query_string = query_string + " foto)";
     query_string = query_string + " VALUES ?";
@@ -1025,23 +1168,9 @@ router.post('/insert_patient', verify_token, (request, res, next) => {
                 message: err.message
             })
         } else {
-            let query_string2 = "";
-            query_string2 = query_string2 + " UPDATE instituciones";
-            query_string2 = query_string2 + " SET student_count= (SELECT COUNT(patients.patient_id) from patients where patients.institution_id = " + request.body.institution_id + ")";
-            query_string2 = query_string2 + " WHERE id = " + request.body.institution_id;
-            con.query(query_string2, function (err, result, fields) {
-                if (err) {
-                    console.log(err);
-                    return res.status(500).json({
-                        title: 'Error',
-                        message: err.message
-                    })
-                } else {
-                    return res.status(200).json({
-                        title: 'Alumno ingresado exitosamente',
-                        message: 'El alumno fue creado de manera satisfactoria'
-                    })
-                }
+            return res.status(200).json({
+                title: 'Alumno ingresado exitosamente',
+                message: 'El alumno fue creado de manera satisfactoria'
             })
         }
     });
@@ -1105,8 +1234,25 @@ router.delete('/delete_patient', verify_token, (request, res, next) => {
 
 router.get('/patient_list', verify_token, (request, res, next) => {
     var query_string = "";
-    query_string = query_string + " SELECT patients.*, instituciones.nombre as institution_name FROM patients";
-    query_string = query_string + " INNER JOIN instituciones ON patients.institution_id = instituciones.id";;
+    query_string = query_string + " SELECT patients.*, instituciones.nombre as institution_name, instituciones.ciudad as city FROM instituciones";
+    query_string = query_string + " INNER JOIN assigned_patients ON assigned_patients.institution_id = instituciones.id";
+    query_string = query_string + " INNER JOIN patients ON assigned_patients.patient_id = assigned_patients.patient_id";
+    con.query(query_string, function (err, result, fields) {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            return res.status(200).json(result);
+        }
+    });
+})
+
+router.get('/get_all_patients', verify_token, (request, res, next) => {
+    var query_string = "";
+    query_string = query_string + " SELECT * FROM patients";
     con.query(query_string, function (err, result, fields) {
         if (err) {
             console.log(err);
@@ -1122,9 +1268,10 @@ router.get('/patient_list', verify_token, (request, res, next) => {
 
 router.get('/patients_institution_list', verify_token, (request, res, next) => {
     var query_string = "";
-    query_string = query_string + " SELECT patients.*, instituciones.nombre as institution_name FROM patients";
-    query_string = query_string + " INNER JOIN instituciones on patients.institution_id = instituciones.id";
-    query_string = query_string + " WHERE patients.institution_id = " + request.query.institution_id;
+    query_string = query_string + " SELECT patients.*, instituciones.nombre as institution_name FROM instituciones";
+    query_string = query_string + " INNER JOIN assigned_patients on assigned_patients.institution_id = instituciones.id";
+    query_string = query_string + " INNER JOIN patients on patients.patient_id = assigned_patients.patient_id";
+    query_string = query_string + " WHERE instituciones.id = " + request.query.institution_id;
     con.query(query_string, function (err, result, fields) {
         if (err) {
             console.log(err);
@@ -1137,6 +1284,143 @@ router.get('/patients_institution_list', verify_token, (request, res, next) => {
         }
     });
 })
+
+router.post('/assign_patient', verify_token, (request, res, next) => {
+    let records = [
+        [
+            request.body.institution_id,
+            request.body.patient_id,
+        ],
+    ];
+    let query_string = "";
+    query_string = query_string + " INSERT INTO assigned_patients";
+    query_string = query_string + " (institution_id,";
+    query_string = query_string + " patient_id)";
+    query_string = query_string + " VALUES ?";
+
+    con.query(query_string, [records], function (err, result, fields) {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({
+                title: 'Error',
+                message: 'El estudiante ya ha sido asignado'
+            })
+        } else {
+            let query_string2 = "";
+            query_string2 = query_string2 + " UPDATE instituciones";
+            query_string2 = query_string2 + " SET student_count= (SELECT COUNT(assigned_patients.patient_id) from assigned_patients WHERE assigned_patients.active = TRUE AND assigned_patients.institution_id = " + request.body.institution_id + ")";
+            query_string2 = query_string2 + " WHERE id = " + request.body.institution_id;
+            con.query(query_string2, function (err, result, fields) {
+                if (err) {
+                    console.log(err);
+                    return res.status(500).json({
+                        title: 'Error',
+                        message: err.message
+                    })
+                } else {
+                    return res.status(200).json({
+                        title: 'Estudiante asignado exitosamente',
+                        message: 'El estudiante fue asignado de manera satisfactoria'
+                    })
+                }
+            })
+        }
+    });
+})
+
+router.put('/deactivate_patient', verify_token, (req, res, next) => {
+    let query = "" +
+        " UPDATE assigned_patients" +
+        " SET active = ?" +
+        " WHERE patient_id = ?";
+    " AND institution_id = ?";
+    let values = [
+        false,
+        req.body.patient_id,
+        req.body.institution_id
+    ];
+    con.query(query, values, function (err, results, fields) {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            res.status(200).json({
+                title: "Estudiante Desactivado Exitosamente",
+                message: 'El estudiante ha sido desactivado de forma satisfactoria'
+            });
+        }
+    });
+})
+
+router.put('/activate_patient', verify_token, (req, res, next) => {
+    let query = "" +
+        " UPDATE assigned_patients" +
+        " SET active = ?" +
+        " WHERE patient_id = ?";
+    " AND institution_id = ?";
+    let values = [
+        true,
+        req.body.patient_id,
+        req.body.institution_id
+    ];
+    con.query(query, values, function (err, results, fields) {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            res.status(200).json({
+                title: "Estudiante activado Exitosamente",
+                message: 'El estudiante ha sido activado de forma satisfactoria'
+            });
+        }
+    });
+})
+
+router.delete('/unassign_patient', verify_token, (req, res, next) => {
+    let query = "" +
+        " DELETE FROM" +
+        " assigned_patients" +
+        " WHERE patient_id = ?";
+    " AND institution_id = ?";
+    let values = [
+        req.query.patient_id,
+        req.query.institution_id
+    ];
+    con.query(query, values, function (err, results, fields) {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            let query_string2 = "";
+            query_string2 = query_string2 + " UPDATE instituciones";
+            query_string2 = query_string2 + " SET student_count= (SELECT COUNT(assigned_patients.patient_id) from assigned_patients WHERE assigned_patients.active = TRUE AND assigned_patients.institution_id = " + req.query.institution_id + ")";
+            query_string2 = query_string2 + " WHERE id = " + req.query.institution_id;
+            con.query(query_string2, function (err, result, fields) {
+                if (err) {
+                    console.log(err);
+                    return res.status(500).json({
+                        title: 'Error',
+                        message: err.message
+                    })
+                } else {
+                    res.status(200).json({
+                        title: "Estudiante Removido Exitosamente",
+                        message: 'El estudiante ha sido removido de forma satisfactoria'
+                    });
+                }
+            })   
+        }
+    });
+});
 
 router.post('/insert_medicamento', verify_token, (request, res, next) => {
     let records = [
@@ -1747,7 +2031,7 @@ router.get('/get_medicamento_inventory', verify_token, (request, res, next) => {
     let query_string = "";
     query_string = query_string + " SELECT products.pum as product_pum, medicamentos.*, products.aus_quantity, products.presentation_quantity, inventory.saldo_inventario, batch_product.id as batch_product_id, batch_product.expiration_date from medicamentos";
     query_string = query_string + " INNER JOIN batch_product ON batch_product.product_id = medicamentos.product_id";
-    query_string = query_string + " INNER JOIN cartera_batch_products ON cartera_batch_products.batch_product_id = batch_product.id";
+    // query_string = query_string + " INNER JOIN cartera_batch_products ON cartera_batch_products.batch_product_id = batch_product.id";
     query_string = query_string + " INNER JOIN products ON products.product_id = medicamentos.product_id";
     query_string = query_string + " INNER JOIN inventory ON inventory.batch_product_id = batch_product.id";
     // query_string = query_string + " WHERE medicamentos.nombre LIKE '%" + request.query.active_principle + "%'";
@@ -2085,6 +2369,135 @@ router.post('/insert_tradename', verify_token, (request, res, next) => {
                 });
             }
 
+        }
+    });
+});
+
+router.post('/insert_tipo_insumo', verify_token, (request, res, next) => {
+    let query_string = "";
+    query_string = query_string + " SELECT name FROM tipo_insumos";
+    query_string = query_string + " WHERE name = '" + request.body.name + "'";
+    con.query(query_string, function (err, result, fields) {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            if (result.length > 0) {
+                return res.status(500).json({
+                    title: 'Error',
+                    message: 'El nombre comercial ya existe'
+                })
+            } else {
+                let records = [
+                    [
+                        request.body.name,
+                    ],
+                ];
+                let query_string1 = "";
+                query_string1 = query_string1 + " INSERT INTO tipo_insumos";
+                query_string1 = query_string1 + " (name)";
+                query_string1 = query_string1 + " VALUES ?";
+                con.query(query_string1, [records], function (err2, result2, fields2) {
+                    if (err2) {
+                        console.log(err2);
+                        return res.status(500).json({
+                            title: 'Error',
+                            message: err2.message
+                        })
+                    } else {
+                        return res.status(200).json({
+                            title: 'Operacion realizada con exito',
+                            message: 'La operacion fue realizada de manera satisfactoria'
+                        })
+                    }
+                });
+            }
+        }
+    });
+});
+
+router.post('/insert_insumo_brand', verify_token, (request, res, next) => {
+    let query_string = "";
+    query_string = query_string + " SELECT name FROM insumo_brands";
+    query_string = query_string + " WHERE name = '" + request.body.name + "'";
+    con.query(query_string, function (err, result, fields) {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            if (result.length > 0) {
+                return res.status(500).json({
+                    title: 'Error',
+                    message: 'El nombre comercial ya existe'
+                })
+            } else {
+                let records = [
+                    [
+                        request.body.tipo_insumo_id,
+                        request.body.name,
+                    ],
+                ];
+                let query_string1 = "";
+                query_string1 = query_string1 + " INSERT INTO insumo_brands";
+                query_string1 = query_string1 + " (tipo_insumo_id,";
+                query_string1 = query_string1 + " name)";
+                query_string1 = query_string1 + " VALUES ?";
+                con.query(query_string1, [records], function (err2, result2, fields2) {
+                    if (err2) {
+                        console.log(err2);
+                        return res.status(500).json({
+                            title: 'Error',
+                            message: err2.message
+                        })
+                    } else {
+                        return res.status(200).json({
+                            title: 'Operacion realizada con exito',
+                            message: 'La operacion fue realizada de manera satisfactoria'
+                        })
+                    }
+                });
+            }
+
+        }
+    });
+});
+
+router.get('/get_insumo_brand_list', verify_token, (request, res, next) => {
+    let query_string = "";
+    query_string = query_string + " SELECT insumo_brands.*, tipo_insumos.name as tipo_insumo  FROM insumo_brands";
+    query_string = query_string + " INNER JOIN tipo_insumos on  tipo_insumos.id = insumo_brands.tipo_insumo_id";
+    query_string = query_string + " WHERE insumo_brands.tipo_insumo_id = " + request.query.tipo_insumo_id;
+    con.query(query_string, function (err, result, fields) {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            return res.status(200).json(result)
+        }
+    });
+});
+
+router.get('/tipo_insumo_list', verify_token, (request, res, next) => {
+    let query_string = "";
+    query_string = query_string + " SELECT *  FROM tipo_insumos";
+    con.query(query_string, function (err, result, fields) {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            return res.status(200).json(result)
         }
     });
 });
@@ -2744,9 +3157,10 @@ router.get('/get_batch', verify_token, (request, res, next) => {
             })
         } else {
             let query_string2 = "";
-            query_string2 = query_string2 + " SELECT batchs.batch_id, batch_product.quantity, medicamentos.* FROM batchs";
+            query_string2 = query_string2 + " SELECT batch_product.*, products.*, batchs.batch_id, batch_product.quantity, medicamentos.*, UPPER(medicamentos.nombre) as nombre FROM batchs";
             query_string2 = query_string2 + " INNER JOIN batch_product on  batch_product.batch_id = batchs.batch_id";
-            query_string2 = query_string2 + " INNER JOIN medicamentos on  medicamentos.product_id = batch_product.product_id";
+            query_string2 = query_string2 + " INNER JOIN products on products.product_id = batch_product.product_id";
+            query_string2 = query_string2 + " INNER JOIN medicamentos on medicamentos.product_id = batch_product.product_id";
             query_string2 = query_string2 + " WHERE batchs.batch_id = " + request.query.batch_id;
             con.query(query_string2, function (err, result2, fields) {
                 if (err) {
@@ -2757,8 +3171,9 @@ router.get('/get_batch', verify_token, (request, res, next) => {
                     })
                 } else {
                     let query_string3 = "";
-                    query_string3 = query_string3 + " SELECT batchs.batch_id, batch_product.quantity, insumos.* FROM batchs";
+                    query_string3 = query_string3 + " SELECT batch_product.*, batchs.batch_id, batch_product.quantity, insumos.*, products.* FROM batchs";
                     query_string3 = query_string3 + " INNER JOIN batch_product on  batch_product.batch_id = batchs.batch_id";
+                    query_string3 = query_string3 + " INNER JOIN products on  products.product_id = batch_product.product_id";
                     query_string3 = query_string3 + " INNER JOIN insumos on  insumos.product_id = batch_product.product_id";
                     query_string3 = query_string3 + " WHERE batchs.batch_id = " + request.query.batch_id;
                     con.query(query_string3, function (err, result3, fields) {
@@ -2851,7 +3266,7 @@ router.get('/get_all_batchs', verify_token, (request, res, next) => {
 
 router.get('/get_available_inventory', verify_token, (request, res, next) => {
     let query_string = "";
-    query_string = query_string + " SELECT (inventory.costo_unidad * inventory.saldo_inventario) as worth, products.presentation_quantity per_presentation, inventory.saldo_inventario as in_stock, (inventory.saldo_inventario * inventory.costo_unidad) as available_product_worth, medicamentos.* from inventory";
+    query_string = query_string + " SELECT batch_product.batch_id as lote, (inventory.costo_unidad * inventory.saldo_inventario) as worth, products.presentation_quantity per_presentation, inventory.saldo_inventario as in_stock, (inventory.saldo_inventario * inventory.costo_unidad) as available_product_worth, inventory.*, medicamentos.* from inventory";
     query_string = query_string + " INNER JOIN batch_product ON batch_product.id = inventory.batch_product_id";
     query_string = query_string + " INNER JOIN products ON batch_product.product_id = products.product_id";
     query_string = query_string + " INNER JOIN medicamentos ON medicamentos.product_id = products.product_id";
@@ -2865,7 +3280,7 @@ router.get('/get_available_inventory', verify_token, (request, res, next) => {
             })
         } else {
             let query_string2 = "";
-            query_string2 = query_string2 + " SELECT (inventory.costo_unidad * inventory.saldo_inventario) as worth, products.presentation_quantity per_presentation, inventory.saldo_inventario as in_stock, (inventory.saldo_inventario * inventory.costo_unidad) as available_product_worth, inventory.*, insumos.* from inventory";
+            query_string2 = query_string2 + " SELECT batch_product.batch_id as lote, (inventory.costo_unidad * inventory.saldo_inventario) as worth, products.presentation_quantity per_presentation, inventory.saldo_inventario as in_stock, (inventory.saldo_inventario * inventory.costo_unidad) as available_product_worth, inventory.*, insumos.* from inventory";
             query_string2 = query_string2 + " INNER JOIN batch_product ON batch_product.id = inventory.batch_product_id";
             query_string2 = query_string2 + " INNER JOIN products ON batch_product.product_id = products.product_id";
             query_string2 = query_string2 + " INNER JOIN insumos ON insumos.product_id = products.product_id";
@@ -3168,10 +3583,60 @@ router.get('/get_search_batch', verify_token, (request, res, next) => {
 
 router.get('/get_consultas', verify_token, (request, res, next) => {
     let query_string = "";
-    query_string = query_string + " SELECT instituciones.nombre as institucion, CONCAT(doctors.first_name, ' ', doctors.last_name) as doctor_name, CONCAT(patients.first_name, ' ', patients.last_name) as patient_name from consultas";
+    query_string = query_string + " SELECT instituciones.nombre as institucion, CONCAT(doctors.first_name, ' ', doctors.last_name) as doctor_name, CONCAT(patients.first_name, ' ', patients.last_name) as patient_name,  CONCAT(patients.grado, ' ', patients.seccion) as curso from consultas";
     query_string = query_string + " INNER JOIN instituciones ON instituciones.id = consultas.institution_id";
     query_string = query_string + " INNER JOIN doctors ON doctors.doctor_id = consultas.doctor_id";
     query_string = query_string + " INNER JOIN patients ON patients.patient_id = consultas.patient_id";
+    con.query(query_string, function (err, result, fields) {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({
+                title: 'Error',
+                message: err.message
+            })
+        } else {
+            let query_string2 = "";
+            query_string2 = query_string2 + " SELECT instituciones.* FROM consultas";
+            query_string2 = query_string2 + " INNER JOIN instituciones ON instituciones.id = consultas.institution_id";
+            con.query(query_string2, function (err, result2, fields) {
+                if (err) {
+                    console.log(err);
+                    return res.status(500).json({
+                        title: 'Error',
+                        message: err.message
+                    })
+                } else {
+                    let query_string3 = "";
+                    query_string3 = query_string3 + " SELECT doctors.* FROM consultas";
+                    query_string3 = query_string3 + " INNER JOIN doctors ON doctors.doctor_id = consultas.doctor_id";
+                    con.query(query_string2, function (err, result3, fields) {
+                        if (err) {
+                            console.log(err);
+                            return res.status(500).json({
+                                title: 'Error',
+                                message: err.message
+                            })
+                        } else {
+                            return res.status(200).json({
+                                consultas: result,
+                                instituciones: result2,
+                                doctors: result3
+                            })
+                        }
+                    })
+                }
+            })
+        }
+    })
+})
+
+router.get('/get_consultas_by_doctor', verify_token, (request, res, next) => {
+    let query_string = "";
+    query_string = query_string + " SELECT instituciones.nombre as institucion, CONCAT(doctors.first_name, ' ', doctors.last_name) as doctor_name, CONCAT(patients.first_name, ' ', patients.last_name) as patient_name,  CONCAT(patients.grado, ' ', patients.seccion) as curso from consultas";
+    query_string = query_string + " INNER JOIN instituciones ON instituciones.id = consultas.institution_id";
+    query_string = query_string + " INNER JOIN doctors ON doctors.doctor_id = consultas.doctor_id";
+    query_string = query_string + " INNER JOIN patients ON patients.patient_id = consultas.patient_id";
+    query_string = query_string + " WHERE doctors.user_id = " + request.query.doctor_id;
     con.query(query_string, function (err, result, fields) {
         if (err) {
             console.log(err);
