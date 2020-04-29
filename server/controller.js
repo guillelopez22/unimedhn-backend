@@ -1061,8 +1061,6 @@ router.get('/doctors_list', verify_token, (request, res, next) => {
 router.get('/active_doctor_list', verify_token, (request, res, next) => {
     let query_string = "";
     query_string = query_string + " SELECT doctors.* FROM doctors";
-    query_string = query_string + " INNER JOIN assigned_doctors ON assigned_doctors.doctor_id = doctors.doctor_id";    
-    query_string = query_string + " WHERE assigned_doctors.active = true";
     con.query(query_string, function (err, result, fields) {
         if (err) {
             return res.status(500).json({
@@ -1332,8 +1330,8 @@ router.put('/deactivate_patient', verify_token, (req, res, next) => {
     let query = "" +
         " UPDATE assigned_patients" +
         " SET active = ?" +
-        " WHERE patient_id = ?";
-    " AND institution_id = ?";
+        " WHERE patient_id = ?" +
+        " AND institution_id = ?";
     let values = [
         false,
         req.body.patient_id,
@@ -1897,7 +1895,7 @@ router.get('/get_insumos_utilizados_consulta_list', verify_token, (request, res,
 });
 
 router.post('/insert_producto', verify_token, (request, res, next) => {
-    var records = [
+    let records = [
         [
             request.body.tradename_id,
             request.body.presentation_id,
@@ -1908,9 +1906,10 @@ router.post('/insert_producto', verify_token, (request, res, next) => {
             request.body.aus_measure_unit_id,
             request.body.pum,
             request.body.pum_measure_unit_id,
+            request.body.sku
         ],
     ];
-    var query_string = "";
+    let query_string = "";
     query_string = query_string + " INSERT INTO products";
     query_string = query_string + " (tradename_id,";
     query_string = query_string + " presentation_id,";
@@ -1920,7 +1919,8 @@ router.post('/insert_producto', verify_token, (request, res, next) => {
     query_string = query_string + " aus_quantity,";
     query_string = query_string + " aus_measure_unit_id,";
     query_string = query_string + " pum,";
-    query_string = query_string + " pum_measure_unit_id)";
+    query_string = query_string + " pum_measure_unit_id,";
+    query_string = query_string + " sku)";
     query_string = query_string + " VALUES ?";
 
     con.query(query_string, [records], function (err, result, fields) {
